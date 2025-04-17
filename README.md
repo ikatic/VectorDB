@@ -55,6 +55,19 @@ db.Add("doc1", embedding);
 var results = db.Search(embedding, 5);
 ```
 
+## Similarity Score Interpretation
+
+The search results include cosine similarity scores that indicate how semantically similar the documents are. Here's how to interpret these scores:
+
+| Cosine Score | Interpretation |
+|--------------|----------------|
+| 0.95 - 1.00 | Extremely similar (nearly duplicate meaning) |
+| 0.90 - 0.95 | Strong semantic similarity |
+| 0.85 - 0.90 | Related in meaning |
+| 0.75 - 0.85 | Weak to moderate similarity |
+| 0.60 - 0.75 | Vaguely related or topically nearby |
+| < 0.60 | Likely unrelated |
+
 ## Configuration
 
 The vector database has a default memory limit of 4GB. This can be adjusted by modifying the `_maxBytes` field in the `VectorDb` class.
