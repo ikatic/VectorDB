@@ -26,7 +26,7 @@ class Program
             return;
         }
 
-        Console.WriteLine("Hello, World!");
+        Console.WriteLine("Initializing Vector Database with OpenAI integration...!");
         var db = new VectorDb();
         
         // Initialize OpenAI API with the secure API key
