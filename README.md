@@ -19,7 +19,7 @@ A simple in-memory vector database implementation in C# that supports OpenAI emb
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/VectorDb.git
+git clone https://github.com/ikatic/VectorDb.git
 cd VectorDb
 ```
 
