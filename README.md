@@ -1,19 +1,20 @@
 # VectorDb
 
-A simple in-memory vector database implementation in C# that supports OpenAI embeddings.
+A simple in-memory vector database implementation in C# that supports local embeddings using Ollama.
 
 ## Features
 
 - Store and search vector embeddings
-- Integration with OpenAI's text-embedding-3-large model
+- Integration with Ollama's nomic-embed-text model
 - Cosine similarity search
 - Memory management with configurable size limits
-- Secure API key management using .NET user secrets
+- Local inference with Ollama (no API keys required)
 
 ## Prerequisites
 
 - .NET 9.0 SDK
-- OpenAI API key
+- Ollama installed and running locally
+- nomic-embed-text model installed in Ollama
 
 ## Setup
 
@@ -28,25 +29,31 @@ cd VectorDb
 dotnet restore
 ```
 
-3. Set up your OpenAI API key:
+3. Install and start Ollama:
 ```bash
-dotnet user-secrets set "OpenAI:ApiKey" "your-api-key"
+# Install Ollama (if not already installed)
+# Start Ollama service
+ollama serve
+```
+
+4. Pull the required model:
+```bash
+ollama pull nomic-embed-text
 ```
 
 ## Usage
 
 The project demonstrates how to:
-- Generate embeddings from text using OpenAI
+- Generate embeddings from text using Ollama's nomic-embed-text model
 - Store embeddings in the vector database
 - Search for similar documents using cosine similarity
 
 Example code:
 ```csharp
 var db = new VectorDb();
-var openAi = new OpenAIAPI(apiKey);
 
-// Get embedding from text
-var embedding = await db.GetEmbeddingAsync(openAi, "Your text here");
+// Get embedding from text using Ollama
+var embedding = await GetEmbeddingAsync("Your text here");
 
 // Store the embedding
 db.Add("doc1", embedding);
@@ -72,9 +79,12 @@ The search results include cosine similarity scores that indicate how semantical
 
 The vector database has a default memory limit of 4GB. This can be adjusted by modifying the `_maxBytes` field in the `VectorDb` class.
 
-## Security
+## Technical Details
 
-API keys are stored securely using .NET user secrets and are never committed to the repository.
+- Embedding dimension: 768
+- Uses Ollama's nomic-embed-text model for local inference
+- Memory-efficient storage with configurable limits
+- Cosine similarity for semantic search
 
 ## License
 
