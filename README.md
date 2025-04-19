@@ -1,6 +1,6 @@
 # VectorDb
 
-A simple in-memory vector database implementation in C# that supports local embeddings using Ollama.
+A simple in-memory vector database implementation in C# that supports local embeddings using Ollama's nomic-embed-text model.
 
 ## Features
 
@@ -9,6 +9,11 @@ A simple in-memory vector database implementation in C# that supports local embe
 - Cosine similarity search
 - Memory management with configurable size limits
 - Local inference with Ollama (no API keys required)
+- File-based persistence for long-term storage
+- Remove vectors by document ID
+- Dual ID system (auto-generated and document IDs)
+- Automatic persistence after modifications
+- Robust error handling and data validation
 
 ## Prerequisites
 
@@ -45,21 +50,37 @@ ollama pull nomic-embed-text
 
 The project demonstrates how to:
 - Generate embeddings from text using Ollama's nomic-embed-text model
-- Store embeddings in the vector database
+- Store embeddings in the vector database with both auto-generated and document IDs
 - Search for similar documents using cosine similarity
+- Automatically persist changes to a file
+- Remove vectors from the database using document IDs
 
 Example code:
 ```csharp
-var db = new VectorDb();
+// Initialize with persistence file
+var db = new VectorDb("vectordb.json");
 
 // Get embedding from text using Ollama
 var embedding = await GetEmbeddingAsync("Your text here");
 
-// Store the embedding
-db.Add("doc1", embedding);
+// Store the embedding with a document ID
+// The method returns the auto-generated ID
+string autoId = await db.AddAsync("document_id", embedding);
+Console.WriteLine($"Auto-generated ID: {autoId}");
 
 // Search for similar documents
 var results = db.Search(embedding, 5);
+foreach (var result in results)
+{
+    Console.WriteLine($"Auto ID: {result.Id}, Doc ID: {result.DocId}, Score: {result.Score}");
+}
+
+// Remove a vector by document ID
+bool removed = await db.RemoveAsync("document_id");
+if (removed)
+{
+    Console.WriteLine("Successfully removed vector");
+}
 ```
 
 ## Similarity Score Interpretation
@@ -85,6 +106,22 @@ The vector database has a default memory limit of 4GB. This can be adjusted by m
 - Uses Ollama's nomic-embed-text model for local inference
 - Memory-efficient storage with configurable limits
 - Cosine similarity for semantic search
+- JSON-based file persistence
+- Automatic loading of persisted data on startup
+- Memory tracking for added and removed vectors
+- Dual ID system:
+  - Auto-generated sequential IDs for internal use
+  - Document IDs for external reference
+- Automatic persistence:
+  - Saves after each Add operation
+  - Saves after each Remove operation
+  - Loads data on initialization if file exists
+- Error handling:
+  - Validates embedding dimensions
+  - Handles file operation errors gracefully
+  - Provides detailed error messages
+  - Skips invalid vectors during loading
+  - Verifies data integrity
 
 ## License
 
