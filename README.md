@@ -13,7 +13,7 @@ A simple in-memory vector database implementation in C# that supports local embe
 - Remove vectors by document ID
 - Dual ID system (auto-generated and document IDs)
 - Automatic persistence after modifications
-- Robust error handling and data validation
+- Basic error handling and data validation
 
 ## Prerequisites
 
