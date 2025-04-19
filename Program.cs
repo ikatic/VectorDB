@@ -28,8 +28,8 @@ class Program
             var embedding2 = await GetEmbeddingAsync(text2);
             
             // Store the embeddings with user-provided IDs
-            string autoId1 = await db.AddAsync("house_description", embedding1);
-            string autoId2 = await db.AddAsync("sky_description", embedding2);
+            string autoId1 = await db.AddAsync("doc_house_description", embedding1);
+            string autoId2 = await db.AddAsync("doc_sky_description", embedding2);
             
             Console.WriteLine($"Added vectors with auto-generated IDs: {autoId1}, {autoId2}");
             
@@ -42,10 +42,10 @@ class Program
             }
             
             // Remove a vector by user ID
-            bool removed = await db.RemoveAsync("house_description");
+            bool removed = await db.RemoveAsync("doc_house_description");
             if (removed)
             {
-                Console.WriteLine("Successfully removed vector with user ID 'house_description'");
+                Console.WriteLine("Successfully removed vector with user ID 'doc_house_description'");
             }
         }
         catch (Exception ex)
