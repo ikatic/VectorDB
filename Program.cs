@@ -22,30 +22,33 @@ class Program
             // Example text to embed
             string text1 = "My house is blue.";
             string text2 = "The sky is blue.";
+            string text3 = "My house has a blue door.";
             
             // Get embeddings from ollama running on localhost:11434
             var embedding1 = await GetEmbeddingAsync(text1);
             var embedding2 = await GetEmbeddingAsync(text2);
+            var embedding3 = await GetEmbeddingAsync(text3);
             
-            // Store the embeddings with user-provided IDs
-            string autoId1 = await db.AddAsync("doc_house_description", embedding1);
-            string autoId2 = await db.AddAsync("doc_sky_description", embedding2);
+            // Store multiple embeddings with the same document ID
+            string autoId1 = await db.AddAsync("doc_house", embedding1);
+            string autoId2 = await db.AddAsync("doc_sky", embedding2);
+            string autoId3 = await db.AddAsync("doc_house", embedding3); // Same doc_house ID
             
-            Console.WriteLine($"Added vectors with auto-generated IDs: {autoId1}, {autoId2}");
+            Console.WriteLine($"Added vectors with auto-generated IDs: {autoId1}, {autoId2}, {autoId3}");
             
             // Search for similar documents
             var results = db.Search(embedding1, 5);
             
             foreach (var result in results)
             {
-                Console.WriteLine($"Auto ID: {result.Id}, User ID: {result.DocId}, Score: {result.Score}");
+                Console.WriteLine($"Auto ID: {result.Id}, Doc ID: {result.DocId}, Score: {result.Score}");
             }
             
-            // Remove a vector by user ID
-            bool removed = await db.RemoveAsync("doc_house_description");
+            // Remove all vectors with the same document ID
+            bool removed = await db.RemoveAsync("doc_house");
             if (removed)
             {
-                Console.WriteLine("Successfully removed vector with user ID 'doc_house_description'");
+                Console.WriteLine("Successfully removed all vectors with doc_house ID");
             }
         }
         catch (Exception ex)
@@ -252,13 +255,18 @@ class VectorDb
 
     public async Task<bool> RemoveAsync(string docId)
     {
-        var item = _vectors.FirstOrDefault(v => v.DocId == docId);
-        if (item != default)
+        var itemsToRemove = _vectors.Where(v => v.DocId == docId).ToList();
+        if (itemsToRemove.Any())
         {
-            long vectorSize = item.Embedding.Length * sizeof(float);
-            _vectors.Remove(item);
-            _totalBytes -= vectorSize;
-            Console.WriteLine($"Removed vector with Doc ID: '{docId}', freed: {vectorSize} bytes, total used: {_totalBytes} bytes.");
+            long totalFreedBytes = 0;
+            foreach (var item in itemsToRemove)
+            {
+                long vectorSize = item.Embedding.Length * sizeof(float);
+                _vectors.Remove(item);
+                _totalBytes -= vectorSize;
+                totalFreedBytes += vectorSize;
+            }
+            Console.WriteLine($"Removed {itemsToRemove.Count} vector(s) with Doc ID: '{docId}', freed: {totalFreedBytes} bytes, total used: {_totalBytes} bytes.");
             
             try
             {
@@ -266,13 +274,13 @@ class VectorDb
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error saving after removing vector: {ex.Message}");
+                Console.WriteLine($"Error saving after removing vectors: {ex.Message}");
                 // Don't throw here to allow the operation to complete even if save fails
             }
             
             return true;
         }
-        Console.WriteLine($"Vector with Doc ID '{docId}' not found.");
+        Console.WriteLine($"No vectors found with Doc ID '{docId}'.");
         return false;
     }
 
