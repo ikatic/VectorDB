@@ -120,7 +120,7 @@ The vector database has a default memory limit of 4GB. This can be adjusted by m
 ## Technical Details
 
 - Embedding dimension: 768
-- Uses Ollama's nomic-embed-text model for local inference
+- Uses nomic-embed-text model and ollama for local inference
 - Memory-efficient storage with configurable limits
 - Cosine similarity for semantic search
 - JSON-based file persistence
