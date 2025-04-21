@@ -23,6 +23,9 @@ class Program
             string text1 = "My house is blue.";
             string text2 = "The sky is blue.";
             string text3 = "My house has a blue door.";
+
+            //For this code example - we're not tokenizing/chunking and assuming the text is clean and doesn't exceed embeddings model input limit.  
+            //Ideally - tokenize and chunk based on your embedding model
             
             // Get embeddings from ollama running on localhost:11434
             var embedding1 = await GetEmbeddingAsync(text1);
