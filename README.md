@@ -1,121 +1,104 @@
 # VectorDb
 
-A simple in-memory vector database implementation in C# that supports local embeddings using Ollama's nomic-embed-text model.
+A simple vector database implementation in C# that uses Ollama's nomic-embed-text model for embeddings. By default, the database supports up to 5 collections, allowing you to organize and manage vectors in separate groups, each with its own persistence file and 1GB memory limit.  Both the number of collections and collection size are configurable in the code.  
 
 ## Features
 
-- Store and search vector embeddings
-- Integration with Ollama's nomic-embed-text model
-- Cosine similarity search
-- Memory management with configurable size limits
-- Local inference with Ollama (no API keys required)
-- File-based persistence for long-term storage
+- Uses Ollama's nomic-embed-text model for generating embeddings
+- Supports up to 5 collections for organizing vectors
+- Each collection has its own persistence file and 1GB memory limit
+- Cosine similarity for vector search
+- Add vectors with auto-generated or custom IDs
 - Remove vectors by document ID
-- Dual ID system (auto-generated and document IDs)
-- Automatic persistence after modifications
-- Basic error handling and data validation
-- Support for multiple embeddings with the same document ID
+- Search for similar vectors within a collection
+- Durable persistence for each collection
 
 ## Prerequisites
 
-- .NET 9.0 SDK
-- Ollama installed and running locally
-- nomic-embed-text model installed in Ollama
+- .NET 6.0 or later
+- Ollama running locally with nomic-embed-text model installed
 
-## Setup
+## Getting Started
 
-1. Clone the repository:
+1. Make sure you have Ollama running locally with the nomic-embed-text model:
 ```bash
-git clone https://github.com/ikatic/VectorDb.git
-cd VectorDb
+ollama run nomic-embed-text
 ```
 
-2. Restore dependencies:
+2. Clone this repository and build the project:
 ```bash
-dotnet restore
+dotnet build
 ```
 
-3. Install and start Ollama:
+3. Run the example program:
 ```bash
-# Install Ollama (if not already installed)
-# Start Ollama service
-ollama serve
-```
-
-4. Pull the required model:
-```bash
-ollama pull nomic-embed-text
+dotnet run
 ```
 
 ## Usage
 
-The project demonstrates how to:
-- Generate embeddings from text using Ollama's nomic-embed-text model
-- Store embeddings in the vector database with both auto-generated and document IDs
-- Search for similar documents using cosine similarity
-- Automatically persist changes to a file
-- Remove vectors from the database using document IDs
+### Initialize the Vector Database
 
-Example code:
 ```csharp
-// Initialize with persistence file
-var db = new VectorDb("vectordb.json");
-
-// Get embedding from text using Ollama
-var embedding = await GetEmbeddingAsync("Your text here");
-
-// Store the embedding with a document ID
-// The method returns the auto-generated ID
-// You can use the same document ID multiple times for different embeddings
-string autoId = await db.AddAsync("document_id", embedding);
-Console.WriteLine($"Auto-generated ID: {autoId}");
-
-// Store another embedding with the same document ID
-var embedding2 = await GetEmbeddingAsync("Another text for the same document");
-string autoId2 = await db.AddAsync("document_id", embedding2);
-Console.WriteLine($"Auto-generated ID for second embedding: {autoId2}");
-
-// Search for similar documents
-var results = db.Search(embedding, 5);
-foreach (var result in results)
-{
-    Console.WriteLine($"Auto ID: {result.Id}, Doc ID: {result.DocId}, Score: {result.Score}");
-}
-
-// Remove all vectors with a specific document ID
-bool removed = await db.RemoveAsync("document_id");
-if (removed)
-{
-    Console.WriteLine("Successfully removed vector(s)");
-}
+// Initialize with a base directory for collections
+var db = new VectorDb("collections");
 ```
 
-## Document ID Behavior
+### Working with Collections
 
-The VectorDb supports multiple embeddings with the same document ID. This is useful for:
-- Different versions or variations of the same document
-- Multiple sections or paragraphs from the same document
-- Different representations of the same content
-- Storing embeddings from different models for the same document
+```csharp
+// Add vectors to a collection
+string id = await db.AddAsync("my_collection", "document text", embedding);
 
-When removing vectors by document ID, all vectors with that document ID will be removed.
+// Search within a collection
+var results = db.Search("my_collection", queryEmbedding, topK: 5);
 
-## Similarity Score Interpretation
+// Remove a document from a collection
+await db.RemoveAsync("my_collection", "document text");
 
-The search results include cosine similarity scores that indicate how semantically similar the documents are. Here's how to interpret these scores:
+// List all collections
+var collections = db.ListCollections();
 
-| Cosine Score | Interpretation |
-|--------------|----------------|
-| 0.95 - 1.00 | Extremely similar (nearly duplicate meaning) |
-| 0.90 - 0.95 | Strong semantic similarity |
-| 0.85 - 0.90 | Related in meaning |
-| 0.75 - 0.85 | Weak to moderate similarity |
-| 0.60 - 0.75 | Vaguely related or topically nearby |
-| < 0.60 | Likely unrelated |
+// Delete a collection
+db.DeleteCollection("my_collection");
+```
+
+### Getting Embeddings
+
+```csharp
+// Get embeddings using Ollama's nomic-embed-text model
+float[] embedding = await GetEmbeddingAsync("Your text here");
+```
+
+### Persistence
+
+Each collection is automatically persisted to a separate JSON file in the specified collections directory. The files are named after the collections (e.g., "my_collection.json"). The database automatically loads existing collections on startup and saves changes after each operation.
+
+## Example Program
+
+The included example program demonstrates:
+- Creating and managing multiple collections
+- Adding vectors to different collections
+- Searching within specific collections
+- Removing documents from collections
+- Deleting collections
+- Listing available collections
+
+## Notes
+
+- Each collection has a memory limit of 1GB to prevent excessive memory usage
+- The database supports a maximum of 5 collections
+- Collections are stored in separate files for better organization and management
+- The database uses cosine similarity for vector search operations
+- Error handling is implemented for file operations and API calls
 
 ## Configuration
 
-The vector database has a default memory limit of 4GB. This can be adjusted by modifying the `_maxBytes` field in the `VectorDb` class.
+The vector database has the following built-in limits:
+- Maximum of 5 collections
+- 1GB memory limit per collection
+
+These limits cannot be adjusted as they are designed to ensure optimal performance and resource usage.
 
 ## Technical Details
 

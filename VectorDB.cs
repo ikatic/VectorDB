@@ -9,43 +9,39 @@ using System.Text.Json;
 using System.Text;
 using System.IO;
 
-
-class VectorDb
+public class Collection
 {
     private readonly List<(string Id, string DocId, float[] Embedding)> _vectors = new();
     private long _totalBytes = 0;
-    private readonly long _maxBytes = 4L * 1024 * 1024 * 1024; // 4 GB
+    private readonly long _maxBytes = 1L * 1024 * 1024 * 1024; // 1 GB per collection
     private readonly string _persistenceFile;
     private int _nextAutoId = 1;
+    public string Name { get; }
 
-    public VectorDb(string persistenceFile = null)
+    public Collection(string name, string baseDir)
     {
-        _persistenceFile = persistenceFile;
-        if (!string.IsNullOrEmpty(_persistenceFile) && File.Exists(_persistenceFile))
+        Name = name;
+        _persistenceFile = Path.Combine(baseDir, $"{name}.json");
+        if (File.Exists(_persistenceFile))
         {
-            Console.WriteLine($"Loading database from file: {_persistenceFile}");
+            Console.WriteLine($"Loading collection '{name}' from file: {_persistenceFile}");
             LoadAsync().Wait();
-            Console.WriteLine($"Loaded {_vectors.Count} vectors from file");
+            Console.WriteLine($"Loaded {_vectors.Count} vectors from collection '{name}'");
         }
-        else if (!string.IsNullOrEmpty(_persistenceFile))
+        else
         {
-            Console.WriteLine($"No existing database file found at: {_persistenceFile}");
+            Console.WriteLine($"Creating new collection '{name}'");
         }
     }
 
     private async Task SaveAsync()
     {
-        if (string.IsNullOrEmpty(_persistenceFile))
-        {
-            Console.WriteLine("No persistence file specified, skipping save");
-            return;
-        }
-
         try
         {
-            Console.WriteLine($"Saving {_vectors.Count} vectors to file: {_persistenceFile}");
+            Console.WriteLine($"Saving {_vectors.Count} vectors to collection file: {_persistenceFile}");
             var data = new
             {
+                Name = Name,
                 Vectors = _vectors.Select(v => new
                 {
                     v.Id,
@@ -61,28 +57,25 @@ class VectorDb
 
             var json = JsonSerializer.Serialize(data, options);
             await File.WriteAllTextAsync(_persistenceFile, json);
-            Console.WriteLine($"Successfully saved database to file: {_persistenceFile}");
+            Console.WriteLine($"Successfully saved collection '{Name}' to file");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error saving database to file: {ex.Message}");
+            Console.WriteLine($"Error saving collection '{Name}' to file: {ex.Message}");
             throw;
         }
     }
 
     private async Task LoadAsync()
     {
-        if (string.IsNullOrEmpty(_persistenceFile) || !File.Exists(_persistenceFile))
-            return;
-
         try
         {
             var json = await File.ReadAllTextAsync(_persistenceFile);
-            var data = JsonSerializer.Deserialize<VectorDbData>(json);
+            var data = JsonSerializer.Deserialize<CollectionData>(json);
 
             if (data?.Vectors == null)
             {
-                Console.WriteLine("Invalid database file format");
+                Console.WriteLine($"Invalid collection file format for '{Name}'");
                 return;
             }
 
@@ -93,21 +86,20 @@ class VectorDb
             {
                 if (vector.Embedding?.Length != 768)
                 {
-                    Console.WriteLine($"Warning: Skipping invalid vector with ID {vector.Id} - incorrect embedding length");
+                    Console.WriteLine($"Warning: Skipping invalid vector with ID {vector.Id} in collection '{Name}' - incorrect embedding length");
                     continue;
                 }
                 await AddAsync(vector.DocId, vector.Embedding);
             }
 
-            // Verify loaded data
             if (_vectors.Count != data.Vectors.Count)
             {
-                Console.WriteLine($"Warning: Loaded {_vectors.Count} vectors but expected {data.Vectors.Count}");
+                Console.WriteLine($"Warning: Loaded {_vectors.Count} vectors but expected {data.Vectors.Count} in collection '{Name}'");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading database from file: {ex.Message}");
+            Console.WriteLine($"Error loading collection '{Name}' from file: {ex.Message}");
             throw;
         }
     }
@@ -118,11 +110,11 @@ class VectorDb
         {
             throw new Exception($"Embedding length must be 768. Got: {embedding.Length}");
         }
-        long vectorSize = embedding.Length * sizeof(float); // 12,288 bytes
+        long vectorSize = embedding.Length * sizeof(float);
 
         if (_totalBytes + vectorSize > _maxBytes)
         {
-            throw new Exception($"Cannot add vector: memory limit exceeded.");
+            throw new Exception($"Cannot add vector: collection '{Name}' memory limit exceeded.");
         }
 
         string autoId = _nextAutoId.ToString();
@@ -130,7 +122,7 @@ class VectorDb
         _totalBytes += vectorSize;
         _nextAutoId++;
         
-        Console.WriteLine($"Added vector with ID: {autoId}, Doc ID: {docId}, size: {vectorSize} bytes, total used: {_totalBytes} bytes.");
+        Console.WriteLine($"Added vector with ID: {autoId}, Doc ID: {docId}, size: {vectorSize} bytes to collection '{Name}', total used: {_totalBytes} bytes.");
         
         try
         {
@@ -138,8 +130,7 @@ class VectorDb
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error saving after adding vector: {ex.Message}");
-            // Don't throw here to allow the operation to complete even if save fails
+            Console.WriteLine($"Error saving after adding vector to collection '{Name}': {ex.Message}");
         }
         
         return autoId;
@@ -158,7 +149,7 @@ class VectorDb
                 _totalBytes -= vectorSize;
                 totalFreedBytes += vectorSize;
             }
-            Console.WriteLine($"Removed {itemsToRemove.Count} vector(s) with Doc ID: '{docId}', freed: {totalFreedBytes} bytes, total used: {_totalBytes} bytes.");
+            Console.WriteLine($"Removed {itemsToRemove.Count} vector(s) with Doc ID: '{docId}' from collection '{Name}', freed: {totalFreedBytes} bytes, total used: {_totalBytes} bytes.");
             
             try
             {
@@ -166,13 +157,12 @@ class VectorDb
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error saving after removing vectors: {ex.Message}");
-                // Don't throw here to allow the operation to complete even if save fails
+                Console.WriteLine($"Error saving after removing vectors from collection '{Name}': {ex.Message}");
             }
             
             return true;
         }
-        Console.WriteLine($"No vectors found with Doc ID '{docId}'.");
+        Console.WriteLine($"No vectors found with Doc ID '{docId}' in collection '{Name}'.");
         return false;
     }
 
@@ -204,9 +194,94 @@ class VectorDb
     }
 }
 
-// Helper class for JSON serialization
-class VectorDbData
+public class VectorDb
 {
+    private readonly Dictionary<string, Collection> _collections = new();
+    private readonly string _baseDir;
+    private const int MaxCollections = 5;
+
+    public VectorDb(string baseDir = "collections")
+    {
+        _baseDir = baseDir;
+        Directory.CreateDirectory(baseDir);
+        LoadExistingCollections();
+    }
+
+    private void LoadExistingCollections()
+    {
+        foreach (var file in Directory.GetFiles(_baseDir, "*.json"))
+        {
+            var collectionName = Path.GetFileNameWithoutExtension(file);
+            _collections[collectionName] = new Collection(collectionName, _baseDir);
+        }
+    }
+
+    public Collection GetOrCreateCollection(string name)
+    {
+        if (!_collections.TryGetValue(name, out var collection))
+        {
+            if (_collections.Count >= MaxCollections)
+            {
+                throw new InvalidOperationException($"Cannot create collection '{name}': Maximum number of collections ({MaxCollections}) reached.");
+            }
+            collection = new Collection(name, _baseDir);
+            _collections[name] = collection;
+        }
+        return collection;
+    }
+
+    public bool DeleteCollection(string name)
+    {
+        if (_collections.TryGetValue(name, out var collection))
+        {
+            _collections.Remove(name);
+            var filePath = Path.Combine(_baseDir, $"{name}.json");
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+                Console.WriteLine($"Collection '{name}' deleted successfully.");
+                return true;
+            }
+        }
+        Console.WriteLine($"Collection '{name}' not found.");
+        return false;
+    }
+
+    public IEnumerable<string> ListCollections()
+    {
+        return _collections.Keys;
+    }
+
+    public async Task<string> AddAsync(string collectionName, string docId, float[] embedding)
+    {
+        var collection = GetOrCreateCollection(collectionName);
+        return await collection.AddAsync(docId, embedding);
+    }
+
+    public async Task<bool> RemoveAsync(string collectionName, string docId)
+    {
+        if (_collections.TryGetValue(collectionName, out var collection))
+        {
+            return await collection.RemoveAsync(docId);
+        }
+        Console.WriteLine($"Collection '{collectionName}' not found.");
+        return false;
+    }
+
+    public List<(string Id, string DocId, float Score)> Search(string collectionName, float[] queryVector, int topK = 5)
+    {
+        if (_collections.TryGetValue(collectionName, out var collection))
+        {
+            return collection.Search(queryVector, topK);
+        }
+        Console.WriteLine($"Collection '{collectionName}' not found.");
+        return new();
+    }
+}
+
+class CollectionData
+{
+    public string Name { get; set; }
     public List<VectorData> Vectors { get; set; }
 }
 

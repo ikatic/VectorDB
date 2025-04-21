@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
 using System.Threading.Tasks;
 using System.Text.Json;
 using System.Text;
@@ -12,46 +11,80 @@ class Program
 {
     static async Task Main(string[] args)
     {
-        Console.WriteLine("Initializing Vector Database with ollama nomic-embed-text integration...!");
+        Console.WriteLine("Initializing Vector Database with ollama nomic-embed-text integration and collection support!");
         
-        // Initialize with persistence file
-        var db = new VectorDb("vectordb.json");
+        // Initialize the vector database with a base directory for collections
+        var db = new VectorDb("collections");
         
         try
         {
-            // Example text to embed
-            string text1 = "My house is blue.";
-            string text2 = "The sky is blue.";
-            string text3 = "My house has a blue door.";
+            // Example texts for different collections
+            var houseTexts = new[] {
+                "My house is blue.",
+                "The house has a red roof.",
+                "The house has a beautiful garden."
+            };
+            
+            var skyTexts = new[] {
+                "The sky is blue.",
+                "Stars twinkle in the night sky.",
+                "The sky is cloudy today."
+            };
 
-            //For this code example - we're not tokenizing/chunking and assuming the text is clean and doesn't exceed embeddings model input limit.  
-            //Ideally - tokenize and chunk based on your embedding model
-            
-            // Get embeddings from ollama running on localhost:11434
-            var embedding1 = await GetEmbeddingAsync(text1);
-            var embedding2 = await GetEmbeddingAsync(text2);
-            var embedding3 = await GetEmbeddingAsync(text3);
-            
-            // Store multiple embeddings with the same document ID
-            string autoId1 = await db.AddAsync("doc_house", embedding1);
-            string autoId2 = await db.AddAsync("doc_sky", embedding2);
-            string autoId3 = await db.AddAsync("doc_house", embedding3); // Same doc_house ID
-            
-            Console.WriteLine($"Added vectors with auto-generated IDs: {autoId1}, {autoId2}, {autoId3}");
-            
-            // Search for similar documents
-            var results = db.Search(embedding1, 5);
-            
-            foreach (var result in results)
+            Console.WriteLine("\nAdding vectors to 'houses' collection...");
+            foreach (var text in houseTexts)
             {
-                Console.WriteLine($"Auto ID: {result.Id}, Doc ID: {result.DocId}, Score: {result.Score}");
+                var embedding = await GetEmbeddingAsync(text);
+                var id = await db.AddAsync("houses", text, embedding);
+                Console.WriteLine($"Added text: '{text}' with ID: {id}");
             }
-            
-            // Remove all vectors with the same document ID
-            bool removed = await db.RemoveAsync("doc_house");
-            if (removed)
+
+            Console.WriteLine("\nAdding vectors to 'sky' collection...");
+            foreach (var text in skyTexts)
             {
-                Console.WriteLine("Successfully removed all vectors with doc_house ID");
+                var embedding = await GetEmbeddingAsync(text);
+                var id = await db.AddAsync("sky", text, embedding);
+                Console.WriteLine($"Added text: '{text}' with ID: {id}");
+            }
+
+            // List all collections
+            Console.WriteLine("\nAvailable collections:");
+            foreach (var collection in db.ListCollections())
+            {
+                Console.WriteLine($"- {collection}");
+            }
+
+            // Search in houses collection
+            Console.WriteLine("\nSearching in 'houses' collection for 'house with garden'...");
+            var queryEmbedding = await GetEmbeddingAsync("house with garden");
+            var houseResults = db.Search("houses", queryEmbedding, 2);
+            foreach (var result in houseResults)
+            {
+                Console.WriteLine($"Doc ID: {result.DocId}, Score: {result.Score}");
+            }
+
+            // Search in sky collection
+            Console.WriteLine("\nSearching in 'sky' collection for 'night stars'...");
+            queryEmbedding = await GetEmbeddingAsync("night stars");
+            var skyResults = db.Search("sky", queryEmbedding, 2);
+            foreach (var result in skyResults)
+            {
+                Console.WriteLine($"Doc ID: {result.DocId}, Score: {result.Score}");
+            }
+
+            // Remove a document from houses collection
+            Console.WriteLine("\nRemoving 'My house is blue' from 'houses' collection...");
+            await db.RemoveAsync("houses", "My house is blue.");
+
+            // Delete sky collection
+            Console.WriteLine("\nDeleting 'sky' collection...");
+            db.DeleteCollection("sky");
+
+            // List remaining collections
+            Console.WriteLine("\nRemaining collections:");
+            foreach (var collection in db.ListCollections())
+            {
+                Console.WriteLine($"- {collection}");
             }
         }
         catch (Exception ex)
@@ -59,6 +92,7 @@ class Program
             Console.WriteLine($"Error: {ex.Message}");
         }
     }
+
     static async Task<float[]> GetEmbeddingAsync(string prompt)
     {
         using var client = new HttpClient { BaseAddress = new Uri("http://localhost:11434") };
