@@ -18,8 +18,23 @@ public class Collection
     private int _nextAutoId = 1;
     public string Name { get; }
 
+    private readonly Dictionary<string, List<(string Id, string DocId, float[] Embedding)>> _lshBuckets = new();
+    private readonly int _numPlanes = 10;
+    private readonly List<float[]> _randomPlanes;
+
+
     public Collection(string name, string baseDir)
     {
+        _randomPlanes = new();
+        var rng = new Random();
+        for (int i = 0; i < _numPlanes; i++)
+        {
+            var plane = new float[768];
+            for (int j = 0; j < 768; j++)
+                plane[j] = (float)(rng.NextDouble() * 2 - 1);
+            _randomPlanes.Add(plane);
+        }
+
         Name = name;
         _persistenceFile = Path.Combine(baseDir, $"{name}.json");
         if (File.Exists(_persistenceFile))
@@ -34,6 +49,21 @@ public class Collection
         }
     }
 
+        private string ComputeHash(float[] vector)
+        {
+            var bits = _randomPlanes
+                .Select(p => DotProduct(p, vector) >= 0 ? '1' : '0')
+                .ToArray();
+            return new string(bits);
+        }
+
+        private float DotProduct(float[] a, float[] b)
+        {
+            float sum = 0;
+            for (int i = 0; i < a.Length; i++)
+                sum += a[i] * b[i];
+            return sum;
+        }
     private async Task SaveAsync()
     {
         try
@@ -122,6 +152,11 @@ public class Collection
         _totalBytes += vectorSize;
         _nextAutoId++;
         
+        string hash = ComputeHash(embedding);
+        if (!_lshBuckets.ContainsKey(hash))
+            _lshBuckets[hash] = new List<(string, string, float[])>();
+        _lshBuckets[hash].Add((autoId, docId, embedding));
+
         Console.WriteLine($"Added vector with ID: {autoId}, Doc ID: {docId}, size: {vectorSize} bytes to collection '{Name}', total used: {_totalBytes} bytes.");
         
         try
@@ -164,6 +199,22 @@ public class Collection
         }
         Console.WriteLine($"No vectors found with Doc ID '{docId}' in collection '{Name}'.");
         return false;
+    }
+
+    public List<(string Id, string DocId, float Score)> AnnSearch(float[] queryVector, int topK = 5)
+    {
+        string hash = ComputeHash(queryVector);
+        if (!_lshBuckets.TryGetValue(hash, out var candidates))
+        {
+            Console.WriteLine($"No LSH bucket for query hash.");
+            return new();
+        }
+
+        return candidates
+            .Select(v => (v.Id, v.DocId, Score: CosineSimilarity(queryVector, v.Embedding)))
+            .OrderByDescending(x => x.Score)
+            .Take(topK)
+            .ToList();
     }
 
     public List<(string Id, string DocId, float Score)> Search(float[] queryVector, int topK = 5)
@@ -277,6 +328,13 @@ public class VectorDb
         Console.WriteLine($"Collection '{collectionName}' not found.");
         return new();
     }
+    public List<(string Id, string DocId, float Score)> AnnSearch(string collectionName, float[] queryVector, int topK = 5)
+    {
+        if (_collections.TryGetValue(collectionName, out var collection))
+            return collection.AnnSearch(queryVector, topK);
+        return new();
+    }
+
 }
 
 class CollectionData

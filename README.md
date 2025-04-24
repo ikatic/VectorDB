@@ -5,8 +5,8 @@ A simple vector database implementation in C# that uses Ollama's nomic-embed-tex
 ## Features
 
 - Uses Ollama's nomic-embed-text model for generating embeddings
-- Supports up to 5 collections for organizing vectors
-- Each collection has its own persistence file and 1GB memory limit
+- Supports up to 5 collections for organizing vectors - configurable in the code.
+- Each collection has its own persistence file and 1GB memory limit - configurable in the code.
 - Cosine similarity for vector search
 - Add vectors with auto-generated or custom IDs
 - Remove vectors by document ID

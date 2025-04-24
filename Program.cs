@@ -57,7 +57,7 @@ class Program
             // Search in houses collection
             Console.WriteLine("\nSearching in 'houses' collection for 'house with garden'...");
             var queryEmbedding = await GetEmbeddingAsync("house with garden");
-            var houseResults = db.Search("houses", queryEmbedding, 2);
+            var houseResults = db.AnnSearch("houses", queryEmbedding, 2);
             foreach (var result in houseResults)
             {
                 Console.WriteLine($"Doc ID: {result.DocId}, Score: {result.Score}");
@@ -66,7 +66,8 @@ class Program
             // Search in sky collection
             Console.WriteLine("\nSearching in 'sky' collection for 'night stars'...");
             queryEmbedding = await GetEmbeddingAsync("night stars");
-            var skyResults = db.Search("sky", queryEmbedding, 2);
+            var skyResults = db.AnnSearch("sky", queryEmbedding, 2);
+           
             foreach (var result in skyResults)
             {
                 Console.WriteLine($"Doc ID: {result.DocId}, Score: {result.Score}");
